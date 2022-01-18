@@ -1,3 +1,6 @@
+[void] [System.Reflection.Assembly]::LoadWithPartialName("System.Drawing") 
+[void] [System.Reflection.Assembly]::LoadWithPartialName("System.Windows.Forms") 
+
 Param(
     [Parameter(Mandatory=$false)] [Switch] $Install,
     [Parameter(Mandatory=$false)] [Switch] $AutoStart,
