@@ -203,7 +203,7 @@ $WPF_ppImage = $MainWindow.FindName("ppImage")
 [System.IntPtr] $PwrHandleSmall = 0
 [System.IntPtr] $PwrHandleLarge = 0
 [void] [Shell32_Extract]::ExtractIconEx("%systemroot%\system32\ddores.dll", 22, [ref] $PwrHandleLarge, [ref] $PwrHandleSmall, 1)
-$SysTrayIcon = [System.Drawing.Icon]::FromHandle($PwrHandleSmall)
+$SysTrayIconImage = [System.Drawing.Icon]::FromHandle($PwrHandleSmall)
 $DialogIcon = [System.Drawing.Icon]::FromHandle($PwrHandleLarge)
 $ppIconBitmap = $DialogIcon.ToBitmap()
 $ppMemoryStream = New-Object System.IO.MemoryStream
@@ -223,7 +223,7 @@ $MainWindow.Add_Deactivated({
 $SysTrayIcon = New-Object System.Windows.Forms.NotifyIcon 
 $CurrentPlan = Get-CurrentPowerPlan
 $SysTrayIcon.Text = "Current Plan: $CurrentPlan" 
-$SysTrayIcon.Icon = $SysTrayIcon 
+$SysTrayIcon.Icon = $SysTrayIconImage 
 $SysTrayIcon.Visible = $true 
 $MenuItem_Exit = New-Object System.Windows.Forms.MenuItem 
 $MenuItem_Exit.Text = "Exit" 
