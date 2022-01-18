@@ -75,3 +75,17 @@ In order to get the System Tray icon to be permanently visible (i.e. not in the 
 **Why do I only see Balanced in the Select Plan combo box?**
 
 Windows 11 only shows the Balanced power plan by default. Use the -RestorePlan OneTime parameter to restore the hidden default plans: High Performance, Ultimate Performance, and Power Saver
+
+**I get an error about Execution Policy in my PowerShell window when I try to run the script**
+
+The default PowerShell execution policy requires scripts to be signed. Temporarily disable this restriction in the current window by running 
+
+```
+Set-ExecutionPolicy Bypass -Scope Process
+```
+
+Alternatively you can disable this restriction globally on your system by running this in a PowerShell window launched as Administrator
+
+```
+Set-ExecutionPolicy Bypass
+```
