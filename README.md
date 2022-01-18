@@ -70,7 +70,7 @@ In order to get the System Tray icon to be permanently visible (i.e. not in the 
 
 ![](https://user-images.githubusercontent.com/67383581/150015967-b4f2783d-c6b0-4df8-8703-c8d7a00fab74.png)
 
-### Troubleshooting:
+### Troubleshooting
 
 **Why do I only see Balanced in the Select Plan combo box?**
 
@@ -89,3 +89,7 @@ Alternatively you can disable this restriction globally on your system by runnin
 ```
 Set-ExecutionPolicy Bypass
 ```
+
+**The system tray context menu for ppControl is missing.**
+
+Ensure you are running the script from Windows PowerShell (powershell.exe) and not PowerShell v6+ (pwsh.exe). Modern PowerShell has support for Windows Presentation Framework which is used for the main window, but not Windows Forms which is used to create the context menu.
