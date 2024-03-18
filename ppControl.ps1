@@ -6,7 +6,7 @@ Param(
 )
 
 if ($AutoStart) { $Install = $true }
-if ($Uninstall) { $Install = $false ; $RestorePlan = "Nothing"}
+if ($Uninstall) { $Install = $false; Remove-Variable "RestorePlan" -Force; $RestorePlan = "Nothing" }
 
 Add-Type -AssemblyName PresentationFramework, System.Drawing, System.Windows.Forms
 
@@ -44,6 +44,99 @@ Add-Type -TypeDefinition '
 
         public static extern int DestroyIcon(IntPtr hIcon);
     }
+'
+
+$RefAssys = (
+    "PresentationCore",
+    "PresentationFramework",
+    "WindowsBase",
+    "System.Xaml"
+    )
+
+Add-Type -ReferencedAssemblies $RefAssys -TypeDefinition '
+using System;
+using System.Windows;
+using System.Windows.Interop;
+using System.Windows.Media;
+using System.Runtime.InteropServices;
+using System.Xaml;
+
+namespace WpfFluentMaterial
+{
+    public partial class WindowControl 
+    {
+        [Flags]
+        public enum DWMWINDOWATTRIBUTE
+        {
+            DWMWA_USE_IMMERSIVE_DARK_MODE = 20,
+            DWMWA_SYSTEMBACKDROP_TYPE = 38
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        public struct MARGINS
+        {
+            public int cxLeftWidth;      // width of left border that retains its size
+            public int cxRightWidth;     // width of right border that retains its size
+            public int cyTopHeight;      // height of top border that retains its size
+            public int cyBottomHeight;   // height of bottom border that retains its size
+        }
+
+        [DllImport("dwmapi.dll")]
+        static extern int DwmExtendFrameIntoClientArea(
+            IntPtr hwnd,
+            ref MARGINS pMarInset);
+
+        [DllImport("dwmapi.dll")]
+        static extern int DwmSetWindowAttribute(
+            IntPtr hwnd, 
+            DWMWINDOWATTRIBUTE dwAttribute, 
+            ref int pvAttribute, 
+            int cbAttribute);
+
+        //////// Added to remove the Close button ////////
+        private const int GWL_STYLE = -16;
+        
+        private const int WS_SYSMENU = 0x80000;
+        
+        [DllImport("user32.dll", SetLastError = true)]
+        private static extern int GetWindowLong(IntPtr hWnd, int nIndex);
+        
+        [DllImport("user32.dll")]
+        private static extern int SetWindowLong(IntPtr hWnd, int nIndex, int dwNewLong);
+        //////// End additions ////////
+
+        public static void SetWindowProperties(Window appWindow, int darkMode, int materialType)
+        {
+            IntPtr mainWindowPtr = new WindowInteropHelper(appWindow).Handle;
+            HwndSource mainWindowSrc = HwndSource.FromHwnd(mainWindowPtr);
+            mainWindowSrc.CompositionTarget.BackgroundColor = Color.FromArgb(0, 0, 0, 0);
+
+            MARGINS margins = new MARGINS();
+            margins.cxLeftWidth = -1;
+            margins.cxRightWidth = -1;
+            margins.cyTopHeight = -1;
+            margins.cyBottomHeight = -1;
+
+            SetWindowLong(mainWindowPtr, GWL_STYLE, GetWindowLong(mainWindowPtr, GWL_STYLE) & ~WS_SYSMENU); // Added to remove the Close button. See above.
+
+            DwmExtendFrameIntoClientArea(
+                mainWindowSrc.Handle, 
+                ref margins);
+
+            DwmSetWindowAttribute(
+                mainWindowPtr,
+                DWMWINDOWATTRIBUTE.DWMWA_USE_IMMERSIVE_DARK_MODE,
+                ref darkMode,
+                Marshal.SizeOf<int>()); 
+
+            DwmSetWindowAttribute(
+                mainWindowPtr,
+                DWMWINDOWATTRIBUTE.DWMWA_SYSTEMBACKDROP_TYPE,
+                ref materialType,
+                Marshal.SizeOf<int>()); 
+        }
+    }
+}
 '
 
 $GuidRegEx = '(\{){0,1}[0-9a-fA-F]{8}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{12}(\}){0,1}'
@@ -114,7 +207,7 @@ Function Install-ppControl {
     $Shortcut = $Wscript.CreateShortcut("$env:APPDATA\Microsoft\Windows\Start Menu\Windows Power Plan Control.lnk")
     $Shortcut.TargetPath = "$env:SystemRoot\System32\Conhost.exe" 
     $Shortcut.Arguments = 'powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File %LocalAppData%\ppControl.ps1'
-    $Shortcut.IconLocation = "$env:SystemRoot\system32\ddores.dll,22"
+    $Shortcut.IconLocation = "$env:SystemRoot\system32\ddores.dll,24" #previous index was 22, changed in build 25258
     $Shortcut.Save()
 }
 
@@ -144,34 +237,43 @@ if ($Uninstall) {
 }
 
 [xml]$Xaml = @"
-<Window x:Class="System.Windows.Window"
-xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" 
-xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" 
-Name="window" WindowStyle="None" Height="133" Width="370" 
-ResizeMode="NoResize" ShowInTaskbar="False" Topmost="True"
-AllowsTransparency="True" Background="Transparent">
-    <Window.Clip>
-        <RectangleGeometry Rect="0,0,370,133" RadiusX="10" RadiusY="10"/>
-    </Window.Clip>
-    <Grid Name="grid" Background="#333333" Height="133" Width="370">
-        <Image x:Name="ppImage" Height="64" Width="64" Margin="10,50,0,15" HorizontalAlignment="Left" VerticalAlignment="Top"/>
-        <Label Content="Windows Power Plan Control" Foreground="White" FontSize="20" Margin="0,8,0,0" HorizontalAlignment="Center" VerticalAlignment="Top" FontWeight="DemiBold"/>
-        <Label Content="Current Plan" Foreground="White" FontSize="16" HorizontalAlignment="Left" Margin="75,50,0,0" />
-        <Label Content="Set Plan" Foreground="White" FontSize="16" HorizontalAlignment="Left" Margin="75,80,0,0" />
-        <Label Name="labelCurrentPlan" Foreground="White" FontSize="16" HorizontalAlignment="Left" Margin="175,50,0,0" FontWeight="DemiBold" />
-        <ComboBox x:Name="ppComboBox" HorizontalAlignment="Left" Margin="179,82,0,0" VerticalAlignment="Top" Width="170" Background="Black" FontSize="16">
-            <ComboBox.Clip>
-                <RectangleGeometry Rect="0,0,170,26" RadiusX="5" RadiusY="5"/>
-            </ComboBox.Clip>
-        </ComboBox>
-        <Button x:Name="CplButton" HorizontalAlignment="Left" Margin="341,2,0,0" VerticalAlignment="Top" Background="#333333" Foreground="White" BorderThickness="0,0,0,0">
-            <Button.Clip>
-                <EllipseGeometry RadiusX="12" RadiusY="12" Center="13,13"/>
-            </Button.Clip>
-            <Image x:Name="CplImage" Source="$env:SystemRoot\ImmersiveControlPanel\images\logo.png" Height="24" Width="24"/>
-        </Button>
-    </Grid>
-</Window>
+    <Window x:Class="System.Windows.Window"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" 
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" 
+        Name="window" 
+        Height="133" 
+        Width="370" 
+        ResizeMode="NoResize" 
+        ShowInTaskbar="False" 
+        Topmost="True"
+        Background="Transparent">
+            <WindowChrome.WindowChrome>
+            <WindowChrome
+                CaptionHeight="0"
+                ResizeBorderThickness="0"
+                CornerRadius="0"
+                GlassFrameThickness="-1"
+                UseAeroCaptionButtons="False" />
+            </WindowChrome.WindowChrome>
+            <Grid Name="grid" Height="133" Width="370">
+                <Image x:Name="ppImage" Height="64" Width="64" Margin="10,50,0,15" HorizontalAlignment="Left" VerticalAlignment="Top"/>
+                <Label Content="Windows Power Plan Control" Foreground="White" FontSize="20" Margin="0,8,0,0" HorizontalAlignment="Center" VerticalAlignment="Top" FontWeight="DemiBold"/>
+                <Label Content="Current Plan" Foreground="White" FontSize="16" HorizontalAlignment="Left" Margin="75,50,0,0" />
+                <Label Content="Set Plan" Foreground="White" FontSize="16" HorizontalAlignment="Left" Margin="75,80,0,0" />
+                <Label Name="labelCurrentPlan" Foreground="White" FontSize="16" HorizontalAlignment="Left" Margin="175,50,0,0" FontWeight="DemiBold" />
+                <ComboBox x:Name="ppComboBox" HorizontalAlignment="Left" Margin="179,82,0,0" VerticalAlignment="Top" Width="170" Background="Black" FontSize="16">
+                    <ComboBox.Clip>
+                        <RectangleGeometry Rect="0,0,170,26" RadiusX="5" RadiusY="5"/>
+                    </ComboBox.Clip>
+                </ComboBox>
+                <Button x:Name="CplButton" HorizontalAlignment="Left" Margin="341,2,0,0" VerticalAlignment="Top" Background="#333333" Foreground="White" BorderThickness="0,0,0,0">
+                    <Button.Clip>
+                        <EllipseGeometry RadiusX="12" RadiusY="12" Center="13,13"/>
+                    </Button.Clip>
+                    <Image x:Name="CplImage" Source="$env:SystemRoot\ImmersiveControlPanel\images\logo.png" Height="24" Width="24"/>
+                </Button>
+            </Grid>
+    </Window>
 "@ #Warning: Do not indent!
 
 $MainWindow = [Windows.Markup.XamlReader]::Load((New-Object System.Xml.XmlNodeReader $xaml))
@@ -199,10 +301,10 @@ $WPF_labelCurrentPlan = $MainWindow.FindName("labelCurrentPlan")
 #Access the Power Plan image control
 $WPF_ppImage = $MainWindow.FindName("ppImage")
 
-#Pull in the Power icons from ddores.dll, index 22 (system32 binary)
+#Pull in the Power icons from ddores.dll, index 24 (system32 binary) --was index 22
 [System.IntPtr] $PwrHandleSmall = 0
 [System.IntPtr] $PwrHandleLarge = 0
-[void] [Shell32_Extract]::ExtractIconEx("%systemroot%\system32\ddores.dll", 22, [ref] $PwrHandleLarge, [ref] $PwrHandleSmall, 1)
+[void] [Shell32_Extract]::ExtractIconEx("%systemroot%\system32\ddores.dll", 24, [ref] $PwrHandleLarge, [ref] $PwrHandleSmall, 1)
 $SysTrayIconImage = [System.Drawing.Icon]::FromHandle($PwrHandleSmall)
 $DialogIcon = [System.Drawing.Icon]::FromHandle($PwrHandleLarge)
 $ppIconBitmap = $DialogIcon.ToBitmap()
@@ -243,6 +345,7 @@ $SysTrayIcon.add_Click({
             $MainWindow.Left = $([System.Windows.SystemParameters]::WorkArea.Width - $MainWindow.Width - 15) 
             $MainWindow.Top = $([System.Windows.SystemParameters]::WorkArea.Height - $MainWindow.Height - 15) 
             $MainWindow.Show() 
+            [WpfFluentMaterial.WindowControl]::SetWindowProperties($MainWindow,1,2) #Apply Win11 Visual Style and remove Close button.
             $MainWindow.Activate() 
            }
     }) 
