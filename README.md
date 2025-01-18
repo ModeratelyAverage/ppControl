@@ -1,3 +1,7 @@
+>[!WARNING]
+>### Project Deprecation Notice
+>This project is now deprecated as advancements in Power Overlays have rendered traditional power plans obsolete in most cases. While the project can still be used—particularly on systems without Modern Standby that are incompatible with Power Overlays—its use will be unsupported. Additionally, certain features may not function properly with future Windows updates. Thank you for your support and contributions to this project.
+
 # Windows Power Plan Control (ppControl.ps1)
 
 ### What is Windows Power Plan Control?
